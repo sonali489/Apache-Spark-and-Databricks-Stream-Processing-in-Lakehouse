@@ -1,0 +1,47 @@
+trigger:
+  batch: true
+  branches:
+    include:
+      - '*'
+
+pool:
+  name: SelfHostedPool
+
+steps:
+- script: |
+    pip install pytest requests setuptools wheel
+  displayName: 'Load Python dependencies'
+
+- script: |
+    shopt -s nullglob
+    py_files=(*.py)
+    if [ ${#py_files[@]} -eq 0 ]; then
+      echo "No Python files to run."
+    else
+      for f in "${py_files[@]}"; do
+        echo "Running $f"
+        python3 "$f"
+      done
+    fi
+  displayName: 'Run all .py scripts in folder'
+
+- checkout: self
+  persistCredentials: true
+  clean: true
+
+- script: |    
+    mkdir -p $(Build.BinariesDirectory)
+    cp -v $(Build.Repository.LocalPath)/*.* $(Build.BinariesDirectory)/ || echo "No files copied"
+  displayName: 'Get Changes'
+
+- task: ArchiveFiles@2
+  inputs:
+    rootFolderOrFile: '$(Build.BinariesDirectory)'
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+    replaceExistingArchive: true
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    ArtifactName: 'DatabricksBuild'
